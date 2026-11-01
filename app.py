@@ -120,8 +120,14 @@ def stream_answer(question, hits):
     raise RuntimeError(f"No model available: {last_error}")
 
 
+def normalize(answer):
+    """Some models (e.g. gpt-oss) cite with full-width brackets like 【1】; convert to [1]."""
+    return re.sub(r"\s*【\s*([\d,\s]+?)\s*】", r" [\1]", answer)
+
+
 def cited(answer, n):
     used = set()
+    answer = normalize(answer)
     for g in re.findall(r"\[([\d,\s]+)\]", answer):
         used |= {int(x) for x in re.findall(r"\d+", g)}
     return used & set(range(1, n + 1))
@@ -221,7 +227,7 @@ if question:
                 st.session_state.asked += 1
                 t0 = time.time()
                 try:
-                    answer = st.write_stream(stream_answer(question, hits))
+                    answer = normalize(st.write_stream(stream_answer(question, hits)))
                     used = cited(answer, len(hits))
                     caption = (f"{time.time() - t0:.0f} s · cited {len(used)} of {len(hits)} sources · "
                                f"{st.session_state.get('model_used', '')}")
