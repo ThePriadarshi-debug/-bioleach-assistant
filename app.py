@@ -15,7 +15,9 @@ import numpy as np
 import streamlit as st
 
 # ------------------------------------------------------------------ settings
-INDEX = Path(__file__).parent / "index"
+HERE = Path(__file__).parent
+# index files may sit in index/ or, if uploaded through the GitHub website, next to app.py
+INDEX = HERE / "index" if (HERE / "index" / "chunks.jsonl").exists() else HERE
 EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 DEFAULT_MODELS = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
 TOP_K = 5
