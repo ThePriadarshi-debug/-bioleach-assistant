@@ -34,6 +34,7 @@ EXAMPLES = [
 ]
 
 SYSTEM = """You are a careful research assistant on bioleaching of waste printed circuit boards (PCBs = printed circuit boards) and e-waste.
+You have NO tools and NO browser: never call a tool, just write the answer as text.
 
 How to answer:
 1. Read EVERY numbered source and decide whether it is relevant to the question.
@@ -102,21 +103,24 @@ def stream_answer(question, hits):
                 {"role": "user", "content": f"Sources:\n{context}\n\nQuestion: {question}"}]
     last_error = None
     for model in models():
-        try:
-            stream = client.chat.completions.create(model=model, messages=messages, temperature=0,
-                                                    max_tokens=900, stream=True)
-            st.session_state.model_used = model
-            for part in stream:
-                delta = part.choices[0].delta.content
-                if delta:
-                    yield delta
-            return
-        except Exception as e:
-            last_error = e
-            msg = str(e).lower()
-            if "rate" in msg or "429" in msg:
-                raise RuntimeError("busy") from e
-            continue                  # model retired or unavailable: try the next one
+        for attempt in range(3):      # gpt-oss sometimes tries a built-in 'browser' tool; just retry
+            try:
+                stream = client.chat.completions.create(model=model, messages=messages, temperature=0,
+                                                        max_tokens=900, stream=True)
+                st.session_state.model_used = model
+                for part in stream:
+                    delta = part.choices[0].delta.content
+                    if delta:
+                        yield delta
+                return
+            except Exception as e:
+                last_error = e
+                msg = str(e).lower()
+                if "tool_use_failed" in msg or "called a tool" in msg:
+                    continue
+                if ("rate" in msg or "429" in msg) and "per day" not in msg:
+                    raise RuntimeError("busy") from e
+                break                 # retired, out of daily quota or unavailable: try the next model
     raise RuntimeError(f"No model available: {last_error}")
 
 
